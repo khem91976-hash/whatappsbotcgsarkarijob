@@ -1,19 +1,23 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
 const Parser = require('rss-parser');
 const parser = new Parser();
 
+// ✅ GitHub Actions detection
+const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
+
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: './session_data' // Session को save करने का path
+        dataPath: './.wwebjs_auth'
     }),
-    // ✅ Latest stable WhatsApp Web version
     webVersionCache: {
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.10147.html',
     },
     puppeteer: {
         headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -24,19 +28,12 @@ const client = new Client({
             '--disable-gpu',
             '--disable-web-security',
             '--disable-features=IsolateOrigins,site-per-process',
-            '--disable-site-isolation-trials'
+            '--single-process'  // GitHub Actions के लिए जरूरी
         ],
-        // ✅ Memory optimization
-        dumpio: false,
-        defaultViewport: {
-            width: 1280,
-            height: 720
-        }
+        dumpio: false
     },
-    // ✅ Retry mechanism
     restartOnAuthFail: true,
-    takeoverOnConflict: true,
-    takeoverTimeoutMs: 0
+    takeoverOnConflict: true
 });
 
 const RSS_URL = 'https://cgsarkari.com/feed/';
@@ -44,42 +41,53 @@ const GROUP_NAME = 'cg sarkari job and yojna';
 const GROUP_INVITE = 'https://chat.whatsapp.com/DCCSBPujcR5FGan84uAIXt';
 let lastPostLink = "";
 
-// QR Code handler
+// ✅ QR Code handler - GitHub Actions में अलग तरीके से
 client.on('qr', (qr) => {
-    console.log('📱 QR Code generated!');
-    qrcode.generate(qr, { small: true });
+    if (isGitHubActions) {
+        // GitHub Actions में QR code को output में दिखाएं
+        console.log('::warning::QR Code generated! Scan from logs below:');
+        console.log(qr);  // Raw QR string
+    } else {
+        qrcode.generate(qr, { small: true });
+    }
+    console.log('📱 QR Code generated! Scan karein...');
 });
 
 client.on('ready', () => {
-    console.log('✅ CGSarkari Bot ready!');
+    console.log('✅ Bot ready!');
     checkFeed();
+    
+    // ✅ GitHub Actions में 2 मिनट बाद auto-exit
+    if (isGitHubActions) {
+        setTimeout(() => {
+            console.log('🛑 GitHub Actions: Auto shutdown');
+            client.destroy();
+            process.exit(0);
+        }, 120000);  // 2 minutes
+    }
+});
+
+client.on('authenticated', () => {
+    console.log('🔐 Authenticated!');
 });
 
 client.on('auth_failure', (msg) => {
     console.error('❌ Auth failed:', msg);
+    if (isGitHubActions) process.exit(1);
 });
 
 client.on('disconnected', (reason) => {
     console.log('❌ Disconnected:', reason);
-    // Auto-reconnect
-    setTimeout(() => {
-        console.log('🔄 Reconnecting...');
-        client.initialize().catch(console.error);
-    }, 5000);
-});
-
-// ✅ Error handling
-client.on('error', (error) => {
-    console.error('❌ Client error:', error);
+    process.exit(0);
 });
 
 async function checkFeed() {
     try {
-        console.log("🔍 Checking for new posts...");
+        console.log("🔍 Checking RSS feed...");
         const feed = await parser.parseURL(RSS_URL);
         
-        if (!feed.items || feed.items.length === 0) {
-            console.log("⚠️ No items found in feed");
+        if (!feed.items?.length) {
+            console.log("⚠️ No items in feed");
             return;
         }
 
@@ -87,50 +95,42 @@ async function checkFeed() {
         const postDate = new Date(latestPost.pubDate).toDateString();
         const today = new Date().toDateString();
 
-        console.log(`📰 Latest post: ${latestPost.title} (${postDate})`);
+        console.log(`📰 Latest: ${latestPost.title} | Date: ${postDate}`);
 
         if (latestPost.link !== lastPostLink && postDate === today) {
             lastPostLink = latestPost.link;
             
-            // ✅ Retry logic for getting chats
-            let retries = 3;
-            let myGroup = null;
-            
-            while (retries > 0 && !myGroup) {
-                try {
-                    const chats = await client.getChats();
-                    myGroup = chats.find(chat => 
-                        chat.name && chat.name.toLowerCase() === GROUP_NAME.toLowerCase()
-                    );
-                    
-                    if (!myGroup) {
-                        console.log(`⚠️ Group not found, retrying... (${retries} attempts left)`);
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                    }
-                } catch (chatError) {
-                    console.error('❌ Error getting chats:', chatError.message);
-                }
-                retries--;
-            }
+            const chats = await client.getChats();
+            const myGroup = chats.find(chat => 
+                chat.name?.toLowerCase().includes(GROUP_NAME.toLowerCase())
+            );
 
             if (myGroup) {
-                const message = `🚀 *नई सरकारी नौकरी अपडेट*\n\n*${latestPost.title}*\n\n🔗 यहाँ से देखें: ${latestPost.link}\n\n📢 हमारे ग्रुप से जुड़ें:\n${GROUP_INVITE}\n\n_CGSarkari.com_`;
+                const message = `🚀 *नई सरकारी नौकरी अपडेट*\n\n*${latestPost.title}*\n\n🔗 देखें: ${latestPost.link}\n\n📢 जुड़ें: ${GROUP_INVITE}\n\n_CGSarkari.com_`;
                 
                 await myGroup.sendMessage(message);
-                console.log('✅ Message sent successfully!');
+                console.log('✅ Message sent!');
+                
+                // ✅ Success log for GitHub Actions
+                if (isGitHubActions) {
+                    console.log(`::notice::Message sent: ${latestPost.title}`);
+                }
             } else {
-                console.log('❌ Could not find group after retries');
+                console.log('❌ Group not found!');
+                console.log('Available groups:', chats.filter(c => c.isGroup).map(c => c.name));
             }
         } else {
-            console.log("😴 No new post today or already sent");
+            console.log("😴 No new post today");
         }
     } catch (error) {
-        console.error('❌ Feed check error:', error.message);
+        console.error('❌ Error:', error.message);
     }
 }
 
-// 6 hours interval
-setInterval(checkFeed, 21600000);
+// 6 hours interval (local run के लिए)
+if (!isGitHubActions) {
+    setInterval(checkFeed, 21600000);
+}
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
@@ -139,14 +139,9 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
-// Initialize with error handling
-(async () => {
-    try {
-        console.log('🚀 Starting bot...');
-        await client.initialize();
-    } catch (error) {
-        console.error('❌ Initialization failed:', error.message);
-        console.log('🔄 Retrying in 10 seconds...');
-        setTimeout(() => client.initialize(), 10000);
-    }
-})();
+// Start
+console.log('🚀 Starting...');
+client.initialize().catch(err => {
+    console.error('❌ Init error:', err.message);
+    process.exit(1);
+});
