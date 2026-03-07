@@ -1,9 +1,7 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const QRCode = require('qrcode'); // npm install qrcode
+const QRCode = require('qrcode');
 const fs = require('fs');
-const Parser = require('rss-parser');
-const parser = new Parser();
 
 const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
 
@@ -17,7 +15,7 @@ const client = new Client({
     },
     puppeteer: {
         headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        // executablePath हटा दिया गया है ताकि Puppeteer अपना डिफ़ॉल्ट ब्राउज़र इस्तेमाल करे
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -26,7 +24,6 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu',
-            '--disable-web-security',
             '--single-process'
         ]
     },
@@ -34,25 +31,21 @@ const client = new Client({
     takeoverOnConflict: true
 });
 
-// ✅ Improved QR Handler
 client.on('qr', async (qr) => {
     console.log('📱 QR Code generated!');
     
     if (isGitHubActions) {
-        // Terminal QR (ASCII Art)
+        // Console में प्रिंट करें
         qrcode.generate(qr, { small: true });
         
-        // File QR (Image) - GitHub Actions artifacts में save होगा
+        // इमेज फाइल बनाएं
         try {
             await QRCode.toFile('./qr-code.png', qr, {
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                },
+                color: { dark: '#000000', light: '#ffffff' },
                 width: 500
             });
             console.log('✅ QR Code saved as qr-code.png');
-            console.log('📥 Download this file from Actions artifacts and scan!');
+            console.log('📥 Please check GitHub Actions Artifacts to download and scan the QR.');
         } catch (err) {
             console.error('❌ QR save error:', err);
         }
@@ -61,4 +54,9 @@ client.on('qr', async (qr) => {
     }
 });
 
-// ... बाकी code same रहेगा ...
+client.on('ready', () => {
+    console.log('✅ WhatsApp Bot is Ready!');
+    // यहाँ से आप अपना मैसेज भेजने का काम करवा सकते हैं
+});
+
+client.initialize();
