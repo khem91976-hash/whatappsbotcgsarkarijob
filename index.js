@@ -54,9 +54,26 @@ client.on('qr', async (qr) => {
     }
 });
 
-client.on('ready', () => {
+// 👇 यहीं पर बदलाव किया गया है 👇
+client.on('ready', async () => {
     console.log('✅ WhatsApp Bot is Ready!');
-    // यहाँ से आप अपना मैसेज भेजने का काम करवा सकते हैं
+
+    try {
+        // 1. यहाँ अपना WhatsApp नंबर डालें (कंट्री कोड 91 के साथ, बिना + लगाए)
+        const myNumber = '91XXXXXXXXXX@c.us'; // <--- यहाँ XXXXXXXXXX की जगह अपना 10 अंकों का नंबर लिखें
+        
+        console.log('📤 Sending test message...');
+        await client.sendMessage(myNumber, '🚀 खेम भाई! GitHub Actions से WhatsApp Bot सफलतापूर्वक चालू हो गया है!');
+        console.log('✅ Message Sent Successfully!');
+
+    } catch (error) {
+        console.error('❌ Message sending failed:', error);
+    } finally {
+        // 2. काम खत्म होने के बाद बॉट को बंद करना ताकि GitHub Action 'Success' हो जाए
+        console.log('🛑 Closing WhatsApp Client to finish Action...');
+        await client.destroy();
+        process.exit(0); 
+    }
 });
 
 client.initialize();
