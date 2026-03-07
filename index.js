@@ -5,14 +5,18 @@ const parser = new Parser();
 
 const client = new Client({
     authStrategy: new LocalAuth(),
+    // webCache को डिसेबल करने से "Execution context" वाला एरर कम आता है
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+    },
     puppeteer: { 
         headless: true,
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--no-zygote',
-            '--single-process'
+            '--disable-gpu'
         ] 
     }
 });
@@ -23,13 +27,16 @@ const GROUP_INVITE = 'https://chat.whatsapp.com/DCCSBPujcR5FGan84uAIXt';
 let lastPostLink = ""; 
 
 client.on('ready', () => {
-    console.log('✅ बॉट चालू है और cgsarkari.com की निगरानी कर रहा है...');
+    console.log('✅ CGSarkari Bot तैयार है!');
     checkFeed();
 });
 
+// लॉगिन फेल होने पर बताएगा
+client.on('auth_failure', msg => { console.error('❌ Auth Error:', msg); });
+
 async function checkFeed() {
     try {
-        console.log("🔍 नई पोस्ट की जाँच हो रही है...");
+        console.log("🔍 पोस्ट चेक कर रहा हूँ...");
         let feed = await parser.parseURL(RSS_URL);
         let latestPost = feed.items[0];
 
@@ -37,7 +44,7 @@ async function checkFeed() {
             const postDate = new Date(latestPost.pubDate).toDateString();
             const today = new Date().toDateString();
 
-            // Logic: लिंक नई होनी चाहिए और तारीख आज की होनी चाहिए
+            // सिर्फ आज की पोस्ट और नई लिंक
             if (latestPost.link !== lastPostLink && postDate === today) {
                 lastPostLink = latestPost.link; 
 
@@ -45,22 +52,22 @@ async function checkFeed() {
                 const myGroup = chats.find(chat => chat.name === GROUP_NAME);
 
                 if (myGroup) {
-                    const message = `🚀 *नई सरकारी नौकरी अपडेट (${postDate})*\n\n*${latestPost.title}*\n\n🔗 यहाँ से देखें: ${latestPost.link}\n\n📢 हमारे ग्रुप से जुड़ें:\n${GROUP_INVITE}\n\n_CGSarkari.com_`;
+                    const message = `🚀 *नई सरकारी नौकरी अपडेट*\n\n*${latestPost.title}*\n\n🔗 यहाँ से देखें: ${latestPost.link}\n\n📢 हमारे ग्रुप से जुड़ें:\n${GROUP_INVITE}\n\n_CGSarkari.com_`;
                     await myGroup.sendMessage(message);
-                    console.log('📩 आज की पोस्ट ग्रुप में भेज दी गई!');
+                    console.log('📩 मैसेज भेज दिया गया!');
                 } else {
-                    console.log('⚠️ ग्रुप नहीं मिला! नाम चेक करें: ' + GROUP_NAME);
+                    console.log('⚠️ ग्रुप नहीं मिला!');
                 }
             } else {
-                console.log("😴 कोई नई आज की पोस्ट नहीं मिली।");
+                console.log("😴 कोई नई आज की पोस्ट नहीं है।");
             }
         }
     } catch (error) {
-        console.log('❌ एरर:', error.message);
+        console.log('❌ Error:', error.message);
     }
 }
 
-// हर 6 घंटे में चेक करेगा
+// हर 6 घंटे में (21600000 ms)
 setInterval(checkFeed, 21600000); 
 
 client.initialize().catch(err => console.error('❌ Init Error:', err));
