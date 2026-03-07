@@ -15,7 +15,6 @@ const client = new Client({
     },
     puppeteer: {
         headless: true,
-        // executablePath हटा दिया गया है ताकि Puppeteer अपना डिफ़ॉल्ट ब्राउज़र इस्तेमाल करे
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -26,76 +25,48 @@ const client = new Client({
             '--disable-gpu',
             '--single-process'
         ]
-    },
-    restartOnAuthFail: true,
-    takeoverOnConflict: true
+    }
 });
 
 client.on('qr', async (qr) => {
     console.log('📱 QR Code generated!');
-    
     if (isGitHubActions) {
-        // Console में प्रिंट करें
-        qrcode.generate(qr, { small: true });
-        
-        // इमेज फाइल बनाएं
-        try {
-            await QRCode.toFile('./qr-code.png', qr, {
-                color: { dark: '#000000', light: '#ffffff' },
-                width: 500
-            });
-            console.log('✅ QR Code saved as qr-code.png');
-            console.log('📥 Please check GitHub Actions Artifacts to download and scan the QR.');
-        } catch (err) {
-            console.error('❌ QR save error:', err);
-        }
-    } else {
         qrcode.generate(qr, { small: true });
     }
 });
 
-// 👇 यहीं पर बदलाव किया गया है 👇
+// 👇 बॉट चालू होने के बाद रुकेगा 👇
 client.on('ready', async () => {
     console.log('✅ WhatsApp Bot is Ready!');
-
-    try {
-        // 1. यहाँ अपना WhatsApp नंबर डालें (कंट्री कोड 91 के साथ, बिना + लगाए)
-        const myNumber = '917006361200@c.us'; // <--- यहाँ XXXXXXXXXX की जगह अपना 10 अंकों का नंबर लिखें
-        
-        console.log('📤 Sending test message...');
-        await client.sendMessage(myNumber, '🚀 खेम भाई! GitHub Actions से WhatsApp Bot सफलतापूर्वक चालू हो गया है!');
-        console.log('✅ Message Sent Successfully!');
-
-    } catch (error) {
-        console.error('❌ Message sending failed:', error);
-    } finally {
-        // 2. काम खत्म होने के बाद बॉट को बंद करना ताकि GitHub Action 'Success' हो जाए
-        console.log('🛑 Closing WhatsApp Client to finish Action...');
-        await client.destroy();
-        process.exit(0); 
-    }
+    console.log('⏳ अब जल्दी से अपने CGSarkari ग्रुप में जाकर !id टाइप करें। बॉट 3 मिनट तक इंतज़ार कर रहा है...');
+    
+    // 3 मिनट (180000 ms) बाद बॉट अपने आप बंद हो जाएगा (ताकि गिटहब एक्शन न अटके)
+    setTimeout(() => {
+        console.log('🛑 Time is up! Closing bot...');
+        client.destroy();
+        process.exit(0);
+    }, 180000); 
 });
 
-client.initialize();
-// 👇 ग्रुप की ID निकालने का जादुई कोड 👇
+// 👇 ग्रुप की ID निकालने का कोड 👇
 client.on('message_create', async (message) => {
-    // अगर आप किसी भी ग्रुप में "!id" (बिना कोट्स के) लिखेंगे, तो बॉट तुरंत उसकी ID बता देगा
     if (message.body === '!id') {
         const chat = await message.getChat();
         if (chat.isGroup) {
             console.log('Group Name:', chat.name);
             console.log('Group ID:', chat.id._serialized);
-            // बॉट ग्रुप में ही रिप्लाई करके ID बता देगा
             await message.reply(`✅ खेम भाई, आपके इस ग्रुप "${chat.name}" की गुप्त ID है:\n\n*${chat.id._serialized}*`);
         } else {
             await message.reply(`✅ आपकी पर्सनल ID है: ${chat.id._serialized}`);
         }
         
-        // ID बताने के बाद बॉट शांति से बंद हो जाएगा ताकि Action पूरा हो जाए
+        // ID बताने के बाद बॉट शांति से बंद हो जाएगा
         setTimeout(() => {
-            console.log('🛑 Closing bot after giving ID...');
+            console.log('🛑 ID successfully sent! Closing bot...');
             client.destroy();
             process.exit(0);
         }, 3000);
     }
 });
+
+client.initialize();
