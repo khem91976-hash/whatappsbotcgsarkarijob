@@ -2,32 +2,77 @@ name: CGSarkari WhatsApp Bot
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # हर 6 घंटे में चलेगा
-  workflow_dispatch:      # हाथ से चलाने के लिए बटन
+    - cron: '0 */6 * * *'  # हर 6 घंटे में
+  workflow_dispatch:       # मैनुअल ट्रिगर
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    
+    # ✅ Timeout जोड़ें ताकि अटका न रहे
+    timeout-minutes: 10
+    
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # v3 → v4 अपडेट
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'  # LTS version
+          cache: 'npm'        # npm cache enable
+
+      # ✅ Chrome/Chromium इंस्टॉल करें (Puppeteer के लिए)
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
 
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgbm-dev wget unzip libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64
+          sudo apt-get install -y \
+            libgbm-dev \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2 \
+            fonts-liberation \
+            libappindicator3-1 \
+            xdg-utils
+
       - name: Install Node Modules
-        run: npm install
-      - name: Unzip Auth
-        run: |
-          ls -R  # यह चेक करने के लिए कि फाइल वहां है या नहीं
-          unzip -o .wwebjs_auth.zip || echo "Zip file not found, skipping unzip"
+        run: npm ci  # npm install की जगह npmci (faster & reliable)
+
+      # ✅ Auth फाइल को सही तरीके से हैंडल करें
+      - name: Restore Auth Session
+        uses: actions/download-artifact@v4
+        with:
+          name: whatsapp-session
+          path: .wwebjs_auth
+        continue-on-error: true  # पहली बार अगर न हो तो error न दे
 
       - name: Run Bot
-        run: node index.js
-        
+        env:
+          # ✅ Puppeteer को Chrome का path बताएं
+          PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          # ✅ Memory optimization
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: |
+          timeout 300 node index.js || echo "Bot finished or timed out"
+
+      # ✅ Session save करें अगली बार के लिए
+      - name: Save Auth Session
+        uses: actions/upload-artifact@v4
+        with:
+          name: whatsapp-session
+          path: .wwebjs_auth/
+          retention-days: 30
+        if: always()  # हमेशा run हो even if previous step fails
