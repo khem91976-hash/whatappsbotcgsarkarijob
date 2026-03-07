@@ -22,6 +22,8 @@ jobs:
 
       - name: Install Node Modules
         run: npm install
+      - name: Unzip Auth
+        run: unzip -o auth.zip
 
       - name: Run Bot
         run: node index.js
