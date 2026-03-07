@@ -1,0 +1,28 @@
+name: CGSarkari WhatsApp Bot
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # हर 6 घंटे में चलेगा
+  workflow_dispatch:      # हाथ से चलाने के लिए बटन
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install System Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgbm-dev
+
+      - name: Install Node Modules
+        run: npm install
+
+      - name: Run Bot
+        run: node index.js
+        
