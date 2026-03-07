@@ -19,39 +19,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
-
-      # ✅ Ubuntu 24.04 Compatible Dependencies
+      # ✅ Puppeteer के लिए जरुरी Linux Dependencies (बिना किसी Git Push के)
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libgbm-dev \
-            libnss3 \
-            libatk1.0-0 \
-            libatk-bridge2.0-0 \
-            libcups2 \
-            libdrm2 \
-            libxkbcommon0 \
-            libxcomposite1 \
-            libxdamage1 \
-            libxrandr2 \
-            libgbm1 \
-            libasound2t64 \
-            fonts-liberation \
-            libappindicator3-1 \
-            xdg-utils
-            npm install qrcode
-            git add package.json package-lock.json
-            git commit -m "Add qrcode image support"
-            git push
+          sudo apt-get install -y libgbm-dev libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2 fonts-liberation libappindicator3-1 xdg-utils
 
       - name: Install Node Modules
         run: npm install
 
+      # ✅ पुराना सेशन वापस लाएं
       - name: Restore WhatsApp Session
         uses: actions/download-artifact@v4
         with:
@@ -59,13 +36,14 @@ jobs:
           path: .wwebjs_auth/
         continue-on-error: true
 
+      # ✅ बॉट को रन करें (300 सेकंड = 5 मिनट का टाइम ताकि आप QR स्कैन कर सकें)
       - name: Run Bot
         env:
-          PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
-        
-          timeout 240 node index.js || echo "Bot finished"
+          timeout 300 node index.js || echo "Bot session completed or timed out"
+
+      # ✅ QR Code को Artifacts में सेव करें
       - name: Upload QR Code
         uses: actions/upload-artifact@v4
         if: always()
@@ -74,6 +52,7 @@ jobs:
           path: qr-code.png
           retention-days: 1
 
+      # ✅ सेशन को वापस सेव करें (ताकि बार-बार QR स्कैन न करना पड़े)
       - name: Save WhatsApp Session
         uses: actions/upload-artifact@v4
         if: always()
