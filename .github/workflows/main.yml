@@ -19,46 +19,35 @@ jobs:
         with:
           node-version: '20'
 
-      # ✅ Puppeteer के लिए जरुरी Linux Dependencies (बिना किसी Git Push के)
-      # ✅ Ubuntu 24.04 के लिए सही Dependencies
       - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgbm-dev libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2t64 fonts-liberation libappindicator3-1 xdg-utils
+
       - name: Install Node Modules
         run: |
           npm install
           npm install qrcode whatsapp-web.js qrcode-terminal
 
-      # ✅ पुराना सेशन वापस लाएं
-      - name: Restore WhatsApp Session
-        uses: actions/download-artifact@v4
+      # 🚀 जादू यहाँ है: यह आपके लॉगिन को हमेशा के लिए याद रखेगा (Cache)
+      - name: Cache WhatsApp Session
+        uses: actions/cache@v4
         with:
-          name: whatsapp-session
-          path: .wwebjs_auth/
-        continue-on-error: true
+          path: .wwebjs_auth
+          key: wa-session-${{ github.run_id }}
+          restore-keys: |
+            wa-session-
 
-      # ✅ बॉट को रन करें (300 सेकंड = 5 मिनट का टाइम ताकि आप QR स्कैन कर सकें)
       - name: Run Bot
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           timeout 300 node index.js || echo "Bot session completed or timed out"
 
-      # ✅ QR Code को Artifacts में सेव करें
-      - name: Upload QR Code
+      - name: Upload QR Code (Only if needed)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qr-code
           path: qr-code.png
           retention-days: 1
-
-      # ✅ सेशन को वापस सेव करें (ताकि बार-बार QR स्कैन न करना पड़े)
-      - name: Save WhatsApp Session
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: whatsapp-session
-          path: .wwebjs_auth/
-          retention-days: 30
