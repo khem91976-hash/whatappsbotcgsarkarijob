@@ -27,13 +27,15 @@ jobs:
       - name: Install Node Modules
         run: |
           npm install
-          npm install qrcode whatsapp-web.js qrcode-terminal
+          npm install qrcode whatsapp-web.js qrcode-terminal rss-parser
 
-      # 🚀 जादू यहाँ है: यह आपके लॉगिन को हमेशा के लिए याद रखेगा (Cache)
-      - name: Cache WhatsApp Session
+      # 🚀 जादू यहाँ है: यह लॉगिन और भेजी गई पोस्ट (दोनों) को याद रखेगा
+      - name: Cache WhatsApp Session & Sent Posts
         uses: actions/cache@v4
         with:
-          path: .wwebjs_auth
+          path: |
+            .wwebjs_auth
+            sent_posts.json
           key: wa-session-${{ github.run_id }}
           restore-keys: |
             wa-session-
