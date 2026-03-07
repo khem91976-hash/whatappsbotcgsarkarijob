@@ -60,7 +60,7 @@ client.on('ready', async () => {
 
     try {
         // 1. यहाँ अपना WhatsApp नंबर डालें (कंट्री कोड 91 के साथ, बिना + लगाए)
-        const myNumber = '91XXXXXXXXXX@c.us'; // <--- यहाँ XXXXXXXXXX की जगह अपना 10 अंकों का नंबर लिखें
+        const myNumber = '917006361200@c.us'; // <--- यहाँ XXXXXXXXXX की जगह अपना 10 अंकों का नंबर लिखें
         
         console.log('📤 Sending test message...');
         await client.sendMessage(myNumber, '🚀 खेम भाई! GitHub Actions से WhatsApp Bot सफलतापूर्वक चालू हो गया है!');
