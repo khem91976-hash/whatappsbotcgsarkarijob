@@ -3,15 +3,13 @@ const qrcode = require('qrcode-terminal');
 const Parser = require('rss-parser');
 const parser = new Parser();
 
-// 💡 सबसे ज़रूरी बदलाव: Puppeteer को लाइटवेट बनाना
+// ✅ सही Client Configuration - सब कुछ एक साथ
 const client = new Client({
     authStrategy: new LocalAuth(),
     webVersionCache: {
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
     },
-    const client = new Client({
-    authStrategy: new LocalAuth(),
     puppeteer: { 
         headless: true,
         args: [
@@ -31,6 +29,12 @@ const RSS_URL = 'https://cgsarkari.com/feed/';
 const GROUP_NAME = 'cg sarkari job and yojna'; 
 const GROUP_INVITE = 'https://chat.whatsapp.com/DCCSBPujcR5FGan84uAIXt';
 let lastPostLink = ""; 
+
+// QR Code दिखाने के लिए
+client.on('qr', (qr) => {
+    qrcode.generate(qr, { small: true });
+    console.log('📱 QR Code स्कैन करें!');
+});
 
 client.on('ready', () => {
     console.log('✅ CGSarkari Bot एकदम तैयार है!');
