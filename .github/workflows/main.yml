@@ -44,6 +44,10 @@ jobs:
             fonts-liberation \
             libappindicator3-1 \
             xdg-utils
+            npm install qrcode
+            git add package.json package-lock.json
+            git commit -m "Add qrcode image support"
+            git push
 
       - name: Install Node Modules
         run: npm install
