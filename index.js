@@ -10,17 +10,18 @@ const client = new Client({
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
     },
+    const client = new Client({
+    authStrategy: new LocalAuth(),
     puppeteer: { 
-        headless: true, // बैकग्राउंड में चलेगा
-        executablePath: '/usr/bin/chromium-browser', // GitHub Actions का डिफ़ॉल्ट Chrome इस्तेमाल करेगा
+        headless: true,
         args: [
-            '--no-sandbox',
+            '--no-sandbox', 
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // मेमोरी क्रैश से बचाता है
+            '--disable-dev-shm-usage', // GitHub सर्वर की मेमोरी क्रैश रोकने के लिए
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // एक ही प्रोसेस में सब कुछ चलाता है (रैम बचाता है)
+            '--single-process', // इसे सिंगल प्रोसेस में चलाने के लिए
             '--disable-gpu'
         ] 
     }
