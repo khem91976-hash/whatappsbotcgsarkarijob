@@ -60,7 +60,15 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
+        
           timeout 240 node index.js || echo "Bot finished"
+      - name: Upload QR Code
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qr-code
+          path: qr-code.png
+          retention-days: 1
 
       - name: Save WhatsApp Session
         uses: actions/upload-artifact@v4
