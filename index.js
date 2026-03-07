@@ -77,3 +77,25 @@ client.on('ready', async () => {
 });
 
 client.initialize();
+// 👇 ग्रुप की ID निकालने का जादुई कोड 👇
+client.on('message_create', async (message) => {
+    // अगर आप किसी भी ग्रुप में "!id" (बिना कोट्स के) लिखेंगे, तो बॉट तुरंत उसकी ID बता देगा
+    if (message.body === '!id') {
+        const chat = await message.getChat();
+        if (chat.isGroup) {
+            console.log('Group Name:', chat.name);
+            console.log('Group ID:', chat.id._serialized);
+            // बॉट ग्रुप में ही रिप्लाई करके ID बता देगा
+            await message.reply(`✅ खेम भाई, आपके इस ग्रुप "${chat.name}" की गुप्त ID है:\n\n*${chat.id._serialized}*`);
+        } else {
+            await message.reply(`✅ आपकी पर्सनल ID है: ${chat.id._serialized}`);
+        }
+        
+        // ID बताने के बाद बॉट शांति से बंद हो जाएगा ताकि Action पूरा हो जाए
+        setTimeout(() => {
+            console.log('🛑 Closing bot after giving ID...');
+            client.destroy();
+            process.exit(0);
+        }, 3000);
+    }
+});
