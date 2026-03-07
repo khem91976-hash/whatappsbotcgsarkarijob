@@ -26,7 +26,7 @@ jobs:
       - name: Unzip Auth
         run: |
           ls -R  # यह चेक करने के लिए कि फाइल वहां है या नहीं
-          unzip -o auth.zip || echo "Zip file not found, skipping unzip"
+          unzip -o .wwebjs_auth.zip || echo "Zip file not found, skipping unzip"
 
       - name: Run Bot
         run: node index.js
