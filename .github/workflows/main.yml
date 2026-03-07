@@ -18,7 +18,9 @@ jobs:
           node-version: '18'
 
       - name: Install System Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgbm-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgbm-dev wget unzip libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2
 
       - name: Install Node Modules
         run: npm install
