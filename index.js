@@ -5,31 +5,55 @@ const parser = new Parser();
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: { args: ['--no-sandbox'] }
+    puppeteer: { 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    }
 });
 
-const RSS_URL = 'cgsarkari.com/feed.xml'; // अपना फीड यहाँ डालें
-const GROUP_NAME = 'cg sarkari job and yojna'; // अपने ग्रुप का नाम यहाँ डालें
+const RSS_URL = 'https://cgsarkari.com/feed/'; // URL सही कर दिया
+const GROUP_NAME = 'cg sarkari job and yojna'; 
+let lastPostLink = ""; // पिछली पोस्ट याद रखने के लिए
 
 client.on('qr', (qr) => {
     qrcode.generate(qr, {small: true});
-    console.log('QR Code generated! Scan it.');
+    console.log('QR Code आ गया है! (लेकिन GitHub पर इसे स्कैन नहीं कर सकते, auth.zip लोड होना चाहिए)');
 });
 
 client.on('ready', () => {
-    console.log('Client is ready!');
-    setInterval(checkFeed, 21600000); // हर 10 मिनट में चेक करेगा
+    console.log('Client is ready! CGSarkari Bot चालू हो गया है।');
+    checkFeed(); // चालू होते ही तुरंत चेक करें
 });
 
 async function checkFeed() {
-    let feed = await parser.parseURL(RSS_URL);
-    let latestPost = feed.items[0];
-    // यहाँ हम मैसेज भेजने का लॉजिक लिखेंगे
-    const chats = await client.getChats();
-    const myGroup = chats.find(chat => chat.name === GROUP_NAME);
-    if (myGroup) {
-        myGroup.sendMessage(`🚀 नई पोस्ट: ${latestPost.title}\nLink: ${latestPost.link}`);
+    try {
+        console.log("फीड चेक हो रही है...");
+        let feed = await parser.parseURL(RSS_URL);
+        let latestPost = feed.items[0];
+
+        // अगर पोस्ट नई है, तभी भेजें
+        if (latestPost && latestPost.link !== lastPostLink) {
+            lastPostLink = latestPost.link; 
+
+            const chats = await client.getChats();
+            const myGroup = chats.find(chat => chat.name === GROUP_NAME);
+
+            if (myGroup) {
+                const message = `🚀 *नई सरकारी नौकरी अपडेट!*\n\n*${latestPost.title}*\n\n🔗 यहाँ से देखें: ${latestPost.link}\n\n_CGSarkari.com_`;
+                await myGroup.sendMessage(message);
+                console.log('ग्रुप में मैसेज भेज दिया गया!');
+            } else {
+                console.log('ग्रुप नहीं मिला! नाम चेक करें: ' + GROUP_NAME);
+            }
+        } else {
+            console.log("कोई नई पोस्ट नहीं मिली।");
+        }
+    } catch (error) {
+        console.log('फीड पढ़ने में एरर:', error.message);
     }
 }
+
+// हर 6 घंटे में चेक करें
+setInterval(checkFeed, 21600000);
 
 client.initialize();
