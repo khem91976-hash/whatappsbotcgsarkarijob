@@ -1,5 +1,6 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const fs = require('fs');
+const axios = require('axios'); // 👈 Axios वापस आ गया है प्रॉक्सी के लिए
 
 const MY_GROUP_ID = '120363422432475431@g.us';
 const SENT_POSTS_FILE = './sent_posts.json';
@@ -32,11 +33,7 @@ const client = new Client({
             '--disable-gpu',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
-            // 🚀 मिसिंग चीज़ 1: WhatsApp को सोने (Sleep) से रोकने वाले कमांड्स
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding'
+            '--single-process'
         ]
     }
 });
@@ -45,32 +42,20 @@ client.on('qr', () => { console.log('QR Code requested, but session should be ca
 
 client.on('ready', async () => {
     console.log('✅ WhatsApp Bot is Ready!');
-    
-    // 🚀 मिसिंग चीज़ 2: WhatsApp कनेक्शन को मजबूत होने के लिए 15 सेकंड दें
-    console.log('⏳ WhatsApp कनेक्शन को स्थिर होने के लिए 15 सेकंड इंतज़ार कर रहा हूँ...');
-    await delay(15000);
-
     console.log(`📅 आज की डेट सेट की गई है: ${todayDateString}`);
 
     try {
-        console.log('🌐 Internal Chrome (Puppeteer) से वेबसाइट खोल रहा हूँ...');
+        console.log('🌐 Proxy API के ज़रिए वेबसाइट का डेटा निकाल रहा हूँ (ताकि WhatsApp स्लीप मोड में न जाए)...');
         
-        const browser = client.pupBrowser;
-        const page = await browser.newPage();
+        // 🚀 नया जुगाड़: Proxy से डेटा लाएं ताकि 403 Error न आए और WhatsApp भी एक्टिव रहे!
+        // Date.now() लगाया है ताकि हमेशा फ्रेश (ताज़ा) अपडेट मिले
+        const feedUrl = `https://cgsarkari.com/feed.xml?t=${Date.now()}`;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`;
         
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
-        const response = await page.goto('https://cgsarkari.com/feed.xml', { waitUntil: 'domcontentloaded' });
-        const xmlData = await response.text();
-        await page.close(); 
+        const response = await axios.get(proxyUrl);
+        const xmlData = response.data;
 
-        // 🚀 मिसिंग चीज़ 3: वेबसाइट बंद करने के बाद WhatsApp वाले टैब को वापस सामने (Focus) लाएं
-        const pages = await browser.pages();
-        if(pages.length > 0) {
-            await pages[0].bringToFront();
-        }
-        await delay(5000); // सामने लाने के बाद 5 सेकंड रुकें
-
+        // 4. देसी जुगाड़ (Regex) से टाइटल, लिंक और डेट छांटें
         const itemRegex = /<item>([\s\S]*?)<\/item>/g;
         const titleRegex = /<title>(.*?)<\/title>/;
         const linkRegex = /<link>(.*?)<\/link>/;
@@ -122,14 +107,14 @@ client.on('ready', async () => {
                 console.log(`✅ Sent Successfully: ${post.title}`);
                 
                 sentPosts.push(post.link);
-                await delay(5000); // 5 सेकंड का गैप
+                await delay(5000); // WhatsApp बैन से बचने के लिए 5 सेकंड का गैप
             }
 
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
             fs.writeFileSync(SENT_POSTS_FILE, JSON.stringify(sentPosts, null, 2));
             
-            console.log('⏳ सभी मैसेज भेज दिए! WhatsApp सर्वर तक पहुँचने के लिए 10 सेकंड रुक रहा हूँ...');
-            await delay(10000); 
+            console.log('⏳ सभी मैसेज भेज दिए! WhatsApp सर्वर तक पहुँचने के लिए 5 सेकंड रुक रहा हूँ...');
+            await delay(5000); 
         }
 
     } catch (error) {
