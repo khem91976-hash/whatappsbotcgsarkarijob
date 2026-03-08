@@ -1,6 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const fs = require('fs');
-const axios = require('axios'); // 👈 Axios वापस आ गया है प्रॉक्सी के लिए
 
 const MY_GROUP_ID = '120363422432475431@g.us';
 const SENT_POSTS_FILE = './sent_posts.json';
@@ -14,7 +13,7 @@ if (fs.existsSync(SENT_POSTS_FILE)) {
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// 📅 आज की डेट निकालें (India Time Zone के हिसाब से)
+// 📅 आज की डेट निकालें (India Time Zone)
 const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
 
 const client = new Client({
@@ -33,7 +32,11 @@ const client = new Client({
             '--disable-gpu',
             '--no-first-run',
             '--no-zygote',
-            '--single-process'
+            '--single-process',
+            // WhatsApp को स्लीप मोड से बचाने के कमांड्स
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
         ]
     }
 });
@@ -45,17 +48,29 @@ client.on('ready', async () => {
     console.log(`📅 आज की डेट सेट की गई है: ${todayDateString}`);
 
     try {
-        console.log('🌐 Proxy API के ज़रिए वेबसाइट का डेटा निकाल रहा हूँ (ताकि WhatsApp स्लीप मोड में न जाए)...');
+        console.log('🌐 Internal Chrome (Puppeteer) से वेबसाइट खोल रहा हूँ...');
         
-        // 🚀 नया जुगाड़: Proxy से डेटा लाएं ताकि 403 Error न आए और WhatsApp भी एक्टिव रहे!
-        // Date.now() लगाया है ताकि हमेशा फ्रेश (ताज़ा) अपडेट मिले
-        const feedUrl = `https://cgsarkari.com/feed.xml?t=${Date.now()}`;
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`;
+        // 1. WhatsApp टैब को पहले सुरक्षित करें
+        const browser = client.pupBrowser;
+        const waPage = client.pupPage; // यह WhatsApp का असली टैब है
         
-        const response = await axios.get(proxyUrl);
-        const xmlData = response.data;
+        // 2. नया टैब खोलें और वेबसाइट से डेटा लाएं
+        const newPage = await browser.newPage();
+        await newPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        const response = await newPage.goto('https://cgsarkari.com/feed.xml', { waitUntil: 'domcontentloaded' });
+        const xmlData = await response.text();
+        await newPage.close(); // वेबसाइट का काम खत्म, टैब बंद!
 
-        // 4. देसी जुगाड़ (Regex) से टाइटल, लिंक और डेट छांटें
+        // 🚀 3. सबसे ज़रूरी काम: WhatsApp टैब को वापस सामने लाएं
+        console.log('🔄 WhatsApp टैब को वापस सामने (Focus) ला रहा हूँ...');
+        await waPage.bringToFront();
+        
+        // 🚀 4. WhatsApp का इंटरनेट (Socket) वापस कनेक्ट होने के लिए 15 सेकंड का इंतज़ार
+        console.log('⏳ WhatsApp कनेक्शन रिफ्रेश होने के लिए 15 सेकंड इंतज़ार कर रहा हूँ ताकि [comms] एरर न आए...');
+        await delay(15000); 
+
+        // 5. XML डेटा से पोस्ट छांटें
         const itemRegex = /<item>([\s\S]*?)<\/item>/g;
         const titleRegex = /<title>(.*?)<\/title>/;
         const linkRegex = /<link>(.*?)<\/link>/;
@@ -107,14 +122,14 @@ client.on('ready', async () => {
                 console.log(`✅ Sent Successfully: ${post.title}`);
                 
                 sentPosts.push(post.link);
-                await delay(5000); // WhatsApp बैन से बचने के लिए 5 सेकंड का गैप
+                await delay(8000); // 8 सेकंड का गैप, ताकि WhatsApp आराम से मैसेज भेजे
             }
 
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
             fs.writeFileSync(SENT_POSTS_FILE, JSON.stringify(sentPosts, null, 2));
             
-            console.log('⏳ सभी मैसेज भेज दिए! WhatsApp सर्वर तक पहुँचने के लिए 5 सेकंड रुक रहा हूँ...');
-            await delay(5000); 
+            console.log('⏳ सभी मैसेज भेज दिए! सर्वर तक पहुँचने के लिए 10 सेकंड रुक रहा हूँ...');
+            await delay(10000); 
         }
 
     } catch (error) {
