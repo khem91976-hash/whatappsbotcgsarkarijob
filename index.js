@@ -1,4 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal'); // 👈 QR कोड जनरेटर वापस ले आया हूँ!
 const fs = require('fs');
 
 const MY_GROUP_ID = '120363422432475431@g.us';
@@ -13,7 +14,6 @@ if (fs.existsSync(SENT_POSTS_FILE)) {
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// 📅 आज की डेट निकालें (India Time Zone)
 const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
 
 const client = new Client({
@@ -33,7 +33,6 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            // WhatsApp को स्लीप मोड से बचाने के कमांड्स
             '--disable-background-timer-throttling',
             '--disable-backgrounding-occluded-windows',
             '--disable-renderer-backgrounding'
@@ -41,7 +40,11 @@ const client = new Client({
     }
 });
 
-client.on('qr', () => { console.log('QR Code requested, but session should be cached!'); });
+// 👇 यह हिस्सा वापस आ गया है, अब आपको टर्मिनल में QR दिखेगा
+client.on('qr', qr => { 
+    console.log('⚠️ नया QR Code जनरेट हुआ है! कृपया इसे स्कैन करें:');
+    qrcode.generate(qr, { small: true }); 
+});
 
 client.on('ready', async () => {
     console.log('✅ WhatsApp Bot is Ready!');
@@ -50,27 +53,22 @@ client.on('ready', async () => {
     try {
         console.log('🌐 Internal Chrome (Puppeteer) से वेबसाइट खोल रहा हूँ...');
         
-        // 1. WhatsApp टैब को पहले सुरक्षित करें
         const browser = client.pupBrowser;
-        const waPage = client.pupPage; // यह WhatsApp का असली टैब है
+        const waPage = client.pupPage; 
         
-        // 2. नया टैब खोलें और वेबसाइट से डेटा लाएं
         const newPage = await browser.newPage();
         await newPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
         const response = await newPage.goto('https://cgsarkari.com/feed.xml', { waitUntil: 'domcontentloaded' });
         const xmlData = await response.text();
-        await newPage.close(); // वेबसाइट का काम खत्म, टैब बंद!
+        await newPage.close(); 
 
-        // 🚀 3. सबसे ज़रूरी काम: WhatsApp टैब को वापस सामने लाएं
         console.log('🔄 WhatsApp टैब को वापस सामने (Focus) ला रहा हूँ...');
         await waPage.bringToFront();
         
-        // 🚀 4. WhatsApp का इंटरनेट (Socket) वापस कनेक्ट होने के लिए 15 सेकंड का इंतज़ार
-        console.log('⏳ WhatsApp कनेक्शन रिफ्रेश होने के लिए 15 सेकंड इंतज़ार कर रहा हूँ ताकि [comms] एरर न आए...');
+        console.log('⏳ WhatsApp कनेक्शन रिफ्रेश होने के लिए 15 सेकंड इंतज़ार कर रहा हूँ...');
         await delay(15000); 
 
-        // 5. XML डेटा से पोस्ट छांटें
         const itemRegex = /<item>([\s\S]*?)<\/item>/g;
         const titleRegex = /<title>(.*?)<\/title>/;
         const linkRegex = /<link>(.*?)<\/link>/;
@@ -106,7 +104,6 @@ client.on('ready', async () => {
             throw new Error("No items parsed");
         }
 
-        // सिर्फ आज की डेट हो AND पहले न भेजी गई हो!
         let newPosts = items.filter(post => post.date === todayDateString && !sentPosts.includes(post.link)).slice(0, 10);
 
         if (newPosts.length === 0) {
@@ -122,7 +119,7 @@ client.on('ready', async () => {
                 console.log(`✅ Sent Successfully: ${post.title}`);
                 
                 sentPosts.push(post.link);
-                await delay(8000); // 8 सेकंड का गैप, ताकि WhatsApp आराम से मैसेज भेजे
+                await delay(8000); 
             }
 
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
