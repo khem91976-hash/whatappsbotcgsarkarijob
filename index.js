@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const puppeteer = require('puppeteer'); // 👈 अलग से ब्राउज़र के लिए
+const puppeteer = require('puppeteer'); 
 const fs = require('fs');
 
 const MY_GROUP_ID = '120363422432475431@g.us';
@@ -21,7 +21,7 @@ const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia
 
     let xmlData = "";
     try {
-        // WhatsApp के बिना, एक हल्का सा ब्राउज़र खोलकर सिर्फ न्यूज़ लाएं
+        // WhatsApp के बिना, एक हल्का सा ब्राउज़र खोलकर सिर्फ न्यूज़ लाएं
         const browser = await puppeteer.launch({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process']
@@ -77,12 +77,12 @@ const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia
 
     if (newPosts.length === 0) {
         console.log('😴 आज की कोई भी नई पोस्ट नहीं मिली। WhatsApp को जगाने की ज़रूरत ही नहीं है! बाय-बाय!');
-        process.exit(0); // 👈 अगर न्यूज़ नहीं है, तो बॉट यहीं बंद हो जाएगा!
+        process.exit(0); // 👈 अगर न्यूज़ नहीं है, तो बॉट यहीं बंद हो जाएगा!
     }
 
     console.log(`📤 आज की ${newPosts.length} नई पोस्ट मिली हैं! अब 2. WhatsApp चालू कर रहा हूँ...`);
 
-    // 4. अगर न्यूज़ है, तभी WhatsApp चालू करें!
+    // 4. अगर न्यूज़ है, तभी WhatsApp चालू करें!
     const client = new Client({
         authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
         webVersionCache: {
@@ -95,19 +95,34 @@ const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia
         }
     });
 
-    client.on('qr', () => { console.log('⚠️ अगर बॉट अटक जाए, तो नया QR स्कैन करना पड़ सकता है।'); });
+    client.on('qr', () => { console.log('⚠️ अगर बॉट अटक जाए, तो नया QR स्कैन करना पड़ सकता है।'); });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp Bot is Ready! सीधा मैसेज भेजना शुरू...');
-        await delay(20000); // 5 सेकंड रिलैक्स होने दें
+        console.log('✅ WhatsApp Bot is Ready!');
+        
+        // 🚀 20 सेकंड का इंतज़ार (Sync के लिए)
+        console.log('⏳ गिटहब के सर्वर पर WhatsApp को पूरी तरह सिंक होने के लिए 20 सेकंड का समय दे रहा हूँ...');
+        await delay(20000); 
 
         try {
+            // 🚀 ग्रुप को खोजना
+            console.log(`🔍 ग्रुप ID चेक कर रहा हूँ...`);
+            const chat = await client.getChatById(MY_GROUP_ID);
+            
+            if (!chat) {
+                console.log('❌ ग्रुप नहीं मिला! कृपया चेक करें कि आपका नंबर उस ग्रुप में ऐड है या नहीं।');
+                throw new Error("Group not found");
+            }
+            console.log(`✅ ग्रुप मिल गया: ${chat.name} | अब मैसेज भेजना शुरू...`);
+
             newPosts.reverse();
             for (let post of newPosts) {
                 const msg = `🚨 *छत्तीसगढ़ ताज़ा अपडेट* 🚨\n\n📌 *${post.title}*\n📅 *दिनांक:* ${post.date}\n\n👇 *पूरी जानकारी यहाँ देखें:*\n🔗 ${post.link}\n\n🌐 *Join CGSarkari WhatsApp Group!*`;
                 
-                await client.sendMessage(MY_GROUP_ID, msg);
-                console.log(`✅ Sent Successfully: ${post.title}`);
+                console.log(`⏳ सेंड कर रहा हूँ: ${post.title}`);
+                // 🚀 यहाँ client.sendMessage की जगह chat.sendMessage इस्तेमाल किया है
+                await chat.sendMessage(msg); 
+                console.log(`✅ Sent Successfully!`);
                 
                 sentPosts.push(post.link);
                 await delay(8000); // 8 सेकंड गैप
@@ -120,7 +135,7 @@ const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia
             await delay(5000);
 
         } catch (error) {
-            console.error('❌ मैसेज भेजने में एरर:', error);
+            console.error('❌ मैसेज भेजने में एरर आया:', error.message);
         } finally {
             console.log('🛑 काम खत्म। Bot बंद कर रहा हूँ और Session Save कर रहा हूँ...');
             await client.destroy();
