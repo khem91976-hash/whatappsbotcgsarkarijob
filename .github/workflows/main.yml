@@ -37,7 +37,7 @@ jobs:
           key: wa-session-${{ github.run_id }}
           restore-keys: |
             wa-session-
-
+          save-always: true
       - name: Run Bot
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
