@@ -30,8 +30,18 @@ const client = new Client({
     }
 });
 
-client.on('qr', qr => { if (isGitHubActions) qrcode.generate(qr, { small: true }); });
+client.on('qr', async qr => { 
+    if (isGitHubActions) {
+        qrcode.generate(qr, { small: true }); 
+        // इमेज फाइल बनाएं ताकि आप डाउनलोड कर सकें
+        try {
+            await QRCode.toFile('./qr-code.png', qr, { width: 500 });
+            console.log('✅ QR Code saved as qr-code.png');
+        } catch (err) { console.error(err); }
+    } 
+});
 
+// 👇 यह वाला हिस्सा आपसे डिलीट हो गया था, मैंने वापस लगा दिया है 👇
 client.on('ready', async () => {
     console.log('✅ WhatsApp Bot is Ready! Fetching feed with Axios...');
 
@@ -85,7 +95,7 @@ client.on('ready', async () => {
                 await client.sendMessage(MY_GROUP_ID, msg);
                 console.log(`✅ Sent: ${post.title}`);
                 sentPosts.push(post.link);
-                await delay(5000);
+                await delay(5000); // 5 सेकंड का गैप
             }
 
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
@@ -93,11 +103,11 @@ client.on('ready', async () => {
         }
 
     } catch (error) {
-        console.error('❌ Error:', error.message);
+        console.error('❌ Error occurred but saving session:', error.message);
     } finally {
-        console.log('🛑 Task Done. Closing...');
+        console.log('🛑 Task Done. Closing bot and SAVING session...');
         await client.destroy();
-        process.exit(0);
+        process.exit(0); // 0 मतलब सक्सेस, ताकि गिटहब सेशन सेव कर ले
     }
 });
 
