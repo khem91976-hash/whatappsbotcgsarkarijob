@@ -2,7 +2,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const fs = require('fs');
-const axios = require('axios'); // 👈 XML डाउनलोड करने के लिए
+const axios = require('axios'); // 👈 API से डेटा लाने के लिए
 
 const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
 
@@ -42,7 +42,6 @@ const client = new Client({
 client.on('qr', async qr => { 
     if (isGitHubActions) {
         qrcode.generate(qr, { small: true }); 
-        // इमेज फाइल बनाएं ताकि आप डाउनलोड कर सकें
         try {
             await QRCode.toFile('./qr-code.png', qr, { width: 500 });
             console.log('✅ QR Code saved as qr-code.png');
@@ -50,63 +49,46 @@ client.on('qr', async qr => {
     } 
 });
 
-// 👇 यह वाला हिस्सा आपसे डिलीट हो गया था, मैंने वापस लगा दिया है 👇
 client.on('ready', async () => {
-    console.log('✅ WhatsApp Bot is Ready! Fetching feed with Axios...');
+    console.log('✅ WhatsApp Bot is Ready! Fetching feed using API Bypass...');
 
     try {
-        // 1. Axios से XML डेटा डाउनलोड करें (User-Agent के साथ)
-        const response = await axios.get('https://cgsarkari.com/feed.xml', {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-            }
-        });
+        // 1. 🚀 यहाँ हमने जादुई RSS2JSON API लगा दी है (यह 403 ब्लॉक को बायपास कर देगी)
+        const response = await axios.get('https://api.rss2json.com/v1/api.json?rss_url=https://cgsarkari.com/feed.xml');
 
-        const xmlData = response.data;
-
-        // 2. XML से टाइटल और लिंक निकालने का देसी जुगाड़ (Regex)
-        const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-        const titleRegex = /<title>(.*?)<\/title>/;
-        const linkRegex = /<link>(.*?)<\/link>/;
-
-        let items = [];
-        let match;
-        while ((match = itemRegex.exec(xmlData)) !== null) {
-            const itemContent = match[1];
-            const titleMatch = itemContent.match(titleRegex);
-            const linkMatch = itemContent.match(linkRegex);
-
-            if (titleMatch && linkMatch) {
-                items.push({
-                    title: titleMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim(),
-                    link: linkMatch[1].trim()
-                });
-            }
+        if (response.data.status !== 'ok') {
+            throw new Error("Feed fetch failed via API");
         }
 
-        if (items.length === 0) {
-            console.log('❌ No items found in XML!');
+        const items = response.data.items;
+
+        if (!items || items.length === 0) {
+            console.log('❌ No items found in feed!');
             return;
         }
 
+        // 2. पुरानी पोस्ट छांटें और टॉप 10 नई पोस्ट निकालें
         let newPosts = items.filter(post => !sentPosts.includes(post.link)).slice(0, 10);
 
         if (newPosts.length === 0) {
-            console.log('😴 सब कुछ अप-टू-डेट है।');
+            console.log('😴 सब कुछ अप-टू-डेट है। कोई नई पोस्ट नहीं।');
         } else {
             console.log(`📤 ${newPosts.length} नई पोस्ट मिली हैं!`);
-            newPosts.reverse();
+            newPosts.reverse(); // सबसे पुरानी पहले भेजें
 
             for (let post of newPosts) {
                 const msg = `🚨 *छत्तीसगढ़ ताज़ा अपडेट* 🚨\n\n📌 *${post.title}*\n\n👇 *पूरी जानकारी यहाँ देखें:*\n🔗 ${post.link}\n\n🌐 *Join CGSarkari WhatsApp Group!*`;
                 
+                // मैसेज ग्रुप में भेजें
                 await client.sendMessage(MY_GROUP_ID, msg);
                 console.log(`✅ Sent: ${post.title}`);
+                
+                // याददाश्त में सेव करें
                 sentPosts.push(post.link);
                 await delay(5000); // 5 सेकंड का गैप
             }
 
+            // याददाश्त 100 से ज़्यादा न हो
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
             fs.writeFileSync(SENT_POSTS_FILE, JSON.stringify(sentPosts, null, 2));
         }
@@ -116,7 +98,7 @@ client.on('ready', async () => {
     } finally {
         console.log('🛑 Task Done. Closing bot and SAVING session...');
         await client.destroy();
-        process.exit(0); // 0 मतलब सक्सेस, ताकि गिटहब सेशन सेव कर ले
+        process.exit(0);
     }
 });
 
