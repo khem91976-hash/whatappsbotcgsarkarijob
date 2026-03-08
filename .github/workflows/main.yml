@@ -28,7 +28,7 @@ jobs:
       - name: Install Node Modules
         run: |
           npm install
-          npm install qrcode whatsapp-web.js qrcode-terminal rss-parser axios
+          npm install qrcode whatsapp-web.js qrcode-terminal rss-parser axios puppeteer
 
       # 🚀 जादू यहाँ है: यह लॉगिन और भेजी गई पोस्ट (दोनों) को याद रखेगा
       - name: Cache WhatsApp Session & Sent Posts
