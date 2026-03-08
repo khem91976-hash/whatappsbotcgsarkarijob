@@ -2,6 +2,9 @@ name: CGSarkari WhatsApp Bot
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '30 23 * * *' # 🌅 यह रोज़ सुबह 5:00 बजे (IST) चलाएगा
+    - cron: '0 11 * * *'  # 🌇 यह रोज़ शाम 4:30 बजे (IST) चलाएगा
 
 jobs:
   run-bot:
