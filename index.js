@@ -1,10 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-const QRCode = require('qrcode');
 const fs = require('fs');
-const axios = require('axios'); // 👈 API से डेटा लाने के लिए
-
-const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
 
 const MY_GROUP_ID = '120363422432475431@g.us';
 const SENT_POSTS_FILE = './sent_posts.json';
@@ -39,56 +34,86 @@ const client = new Client({
     }
 });
 
-client.on('qr', async qr => { 
-    if (isGitHubActions) {
-        qrcode.generate(qr, { small: true }); 
-        try {
-            await QRCode.toFile('./qr-code.png', qr, { width: 500 });
-            console.log('✅ QR Code saved as qr-code.png');
-        } catch (err) { console.error(err); }
-    } 
-});
+// QR कोड अब नहीं चाहिए क्योंकि लॉगिन सेव हो चुका है
+client.on('qr', () => { console.log('QR Code requested, but session should be cached!'); });
 
 client.on('ready', async () => {
-    console.log('✅ WhatsApp Bot is Ready! Fetching feed using API Bypass...');
+    console.log('✅ WhatsApp Bot is Ready!');
 
     try {
-        // 1. 🚀 यहाँ हमने जादुई RSS2JSON API लगा दी है (यह 403 ब्लॉक को बायपास कर देगी)
-        const response = await axios.get('https://api.rss2json.com/v1/api.json?rss_url=https://cgsarkari.com/feed.xml');
+        console.log('🌐 Internal Chrome (Puppeteer) से वेबसाइट खोल रहा हूँ ताकि कोई ब्लॉक न कर सके...');
+        
+        // 1. WhatsApp के ही क्रोम ब्राउज़र में नया टैब (Tab) खोलें
+        const browser = client.pupBrowser;
+        const page = await browser.newPage();
+        
+        // वेबसाइट को लगे कि यह असली इंसान है
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        // 2. आपकी वेबसाइट के feed.xml पर जाएँ
+        const response = await page.goto('https://cgsarkari.com/feed.xml', { waitUntil: 'domcontentloaded' });
+        
+        // 3. वेबसाइट से XML डेटा निकालें
+        const xmlData = await response.text();
+        await page.close(); // टैब बंद कर दें
 
-        if (response.data.status !== 'ok') {
-            throw new Error("Feed fetch failed via API");
+        // 4. देसी जुगाड़ (Regex) से टाइटल, लिंक और डेट (Date) छांटें
+        const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+        const titleRegex = /<title>(.*?)<\/title>/;
+        const linkRegex = /<link>(.*?)<\/link>/;
+        const dateRegex = /<pubDate>(.*?)<\/pubDate>/; // 👈 डेट के लिए नया कोड
+
+        let items = [];
+        let match;
+        while ((match = itemRegex.exec(xmlData)) !== null) {
+            const itemContent = match[1];
+            const titleMatch = itemContent.match(titleRegex);
+            const linkMatch = itemContent.match(linkRegex);
+            const dateMatch = itemContent.match(dateRegex); // 👈 डेट निकालें
+
+            if (titleMatch && linkMatch) {
+                // डेट को साफ़-सुथरा बनाने का लॉजिक
+                let postDate = "Live Update";
+                if (dateMatch) {
+                    try {
+                        let d = new Date(dateMatch[1]);
+                        postDate = d.toLocaleDateString('en-IN'); // इससे डेट 08/03/2026 जैसी दिखेगी
+                    } catch(e) {}
+                }
+
+                items.push({
+                    title: titleMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim(),
+                    link: linkMatch[1].trim(),
+                    date: postDate // 👈 डेट को डेटा में सेव किया
+                });
+            }
         }
 
-        const items = response.data.items;
-
-        if (!items || items.length === 0) {
-            console.log('❌ No items found in feed!');
-            return;
+        if (items.length === 0) {
+            console.log('❌ XML में कोई पोस्ट नहीं मिली! वेबसाइट ने शायद HTML पेज दे दिया है।');
+            throw new Error("No items parsed");
         }
 
-        // 2. पुरानी पोस्ट छांटें और टॉप 10 नई पोस्ट निकालें
+        // 5. डुप्लीकेट रोकने का लॉजिक: टॉप 10 में से सिर्फ "नई" पोस्ट निकालें (जो पहले नहीं भेजी)
         let newPosts = items.filter(post => !sentPosts.includes(post.link)).slice(0, 10);
 
         if (newPosts.length === 0) {
             console.log('😴 सब कुछ अप-टू-डेट है। कोई नई पोस्ट नहीं।');
         } else {
-            console.log(`📤 ${newPosts.length} नई पोस्ट मिली हैं!`);
+            console.log(`📤 ${newPosts.length} नई पोस्ट मिली हैं! ग्रुप में भेज रहा हूँ...`);
             newPosts.reverse(); // सबसे पुरानी पहले भेजें
 
             for (let post of newPosts) {
-                const msg = `🚨 *छत्तीसगढ़ ताज़ा अपडेट* 🚨\n\n📌 *${post.title}*\n\n👇 *पूरी जानकारी यहाँ देखें:*\n🔗 ${post.link}\n\n🌐 *Join CGSarkari WhatsApp Group!*`;
+                // 👈 मैसेज में अब 'दिनांक' भी जुड़ गया है
+                const msg = `🚨 *छत्तीसगढ़ ताज़ा अपडेट* 🚨\n\n📌 *${post.title}*\n📅 *दिनांक:* ${post.date}\n\n👇 *पूरी जानकारी यहाँ देखें:*\n🔗 ${post.link}\n\n🌐 *Join CGSarkari WhatsApp Group!*`;
                 
-                // मैसेज ग्रुप में भेजें
                 await client.sendMessage(MY_GROUP_ID, msg);
-                console.log(`✅ Sent: ${post.title}`);
+                console.log(`✅ Sent Successfully: ${post.title}`);
                 
-                // याददाश्त में सेव करें
                 sentPosts.push(post.link);
-                await delay(5000); // 5 सेकंड का गैप
+                await delay(5000); // WhatsApp बैन से बचने के लिए 5 सेकंड का गैप
             }
 
-            // याददाश्त 100 से ज़्यादा न हो
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
             fs.writeFileSync(SENT_POSTS_FILE, JSON.stringify(sentPosts, null, 2));
         }
