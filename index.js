@@ -99,7 +99,7 @@ const todayDateString = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia
 
     client.on('ready', async () => {
         console.log('✅ WhatsApp Bot is Ready! सीधा मैसेज भेजना शुरू...');
-        await delay(5000); // 5 सेकंड रिलैक्स होने दें
+        await delay(20000); // 5 सेकंड रिलैक्स होने दें
 
         try {
             newPosts.reverse();
