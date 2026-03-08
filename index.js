@@ -32,7 +32,11 @@ const client = new Client({
             '--disable-gpu',
             '--no-first-run',
             '--no-zygote',
-            '--single-process'
+            '--single-process',
+            // 🚀 मिसिंग चीज़ 1: WhatsApp को सोने (Sleep) से रोकने वाले कमांड्स
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
         ]
     }
 });
@@ -41,6 +45,11 @@ client.on('qr', () => { console.log('QR Code requested, but session should be ca
 
 client.on('ready', async () => {
     console.log('✅ WhatsApp Bot is Ready!');
+    
+    // 🚀 मिसिंग चीज़ 2: WhatsApp कनेक्शन को मजबूत होने के लिए 15 सेकंड दें
+    console.log('⏳ WhatsApp कनेक्शन को स्थिर होने के लिए 15 सेकंड इंतज़ार कर रहा हूँ...');
+    await delay(15000);
+
     console.log(`📅 आज की डेट सेट की गई है: ${todayDateString}`);
 
     try {
@@ -54,6 +63,13 @@ client.on('ready', async () => {
         const response = await page.goto('https://cgsarkari.com/feed.xml', { waitUntil: 'domcontentloaded' });
         const xmlData = await response.text();
         await page.close(); 
+
+        // 🚀 मिसिंग चीज़ 3: वेबसाइट बंद करने के बाद WhatsApp वाले टैब को वापस सामने (Focus) लाएं
+        const pages = await browser.pages();
+        if(pages.length > 0) {
+            await pages[0].bringToFront();
+        }
+        await delay(5000); // सामने लाने के बाद 5 सेकंड रुकें
 
         const itemRegex = /<item>([\s\S]*?)<\/item>/g;
         const titleRegex = /<title>(.*?)<\/title>/;
@@ -90,7 +106,7 @@ client.on('ready', async () => {
             throw new Error("No items parsed");
         }
 
-        // 🚀 नया लॉजिक: सिर्फ आज की डेट हो AND पहले न भेजी गई हो!
+        // सिर्फ आज की डेट हो AND पहले न भेजी गई हो!
         let newPosts = items.filter(post => post.date === todayDateString && !sentPosts.includes(post.link)).slice(0, 10);
 
         if (newPosts.length === 0) {
@@ -112,7 +128,6 @@ client.on('ready', async () => {
             if (sentPosts.length > 100) sentPosts = sentPosts.slice(-100);
             fs.writeFileSync(SENT_POSTS_FILE, JSON.stringify(sentPosts, null, 2));
             
-            // 👈 यह बहुत ज़रूरी है: मैसेज सर्वर तक जाने के लिए 10 सेकंड एक्स्ट्रा रुको
             console.log('⏳ सभी मैसेज भेज दिए! WhatsApp सर्वर तक पहुँचने के लिए 10 सेकंड रुक रहा हूँ...');
             await delay(10000); 
         }
